@@ -34,7 +34,7 @@ async function getJaneDoeResponse(userId, userMessage) {
         }
 
         const model = genAI.getGenerativeModel({
-            model: "gemini-3.6-flash",
+            model: "gemini-flash-lite-latest",
             systemInstruction: currentSystemInstruction,
         });
 
