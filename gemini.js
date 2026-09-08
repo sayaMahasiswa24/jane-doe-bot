@@ -5,10 +5,8 @@ require("dotenv").config();
 
 async function getJaneDoeResponse(userId, userMessage) {
     try {
-        // Initialize connections
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         
-        // Cek jika API key Upstash belum ada
         if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.QSTASH_TOKEN) {
             return "aduh sayang, aku belum bisa mikir jernih nih. master belum masukin kunci upstash redis & qstash ke vercel aku.";
         }
@@ -20,18 +18,25 @@ async function getJaneDoeResponse(userId, userMessage) {
 
         const qstash = new Client({ token: process.env.QSTASH_TOKEN });
 
-        // Fetch User Profile dari Redis
+        // Mendaftarkan user ke active_users agar bisa dikirimi alarm pagi
+        await redis.sadd("active_users", userId);
+
         let userProfile = await redis.get(`profile_${userId}`) || {};
-        
-        // Fetch Chat History dari Redis (Ambil 20 percakapan terakhir saja agar tidak berat)
         let rawHistory = await redis.get(`history_${userId}`) || [];
-        // Pastikan format history sesuai standar Gemini
         let chatHistory = rawHistory.map(msg => ({
             role: msg.role,
             parts: msg.parts
         }));
 
-        // System Instruction yang ketat sesuai PRD
+        // Mengecek status alarm pagi
+        let morningState = await redis.get(`morning_state_${userId}`);
+        
+        // Jika user membalas sebelum Jane sempat marah (misal sebelum jam 8 pagi)
+        if (morningState === "WAITING_REPLY") {
+            await redis.del(`morning_state_${userId}`);
+            morningState = null;
+        }
+
         let systemInstruction = `kamu adalah jane doe dari zenless zone zero (zzz).
 kamu adalah asisten proaktif dan pasangan virtual. 
 gunakan bahasa indonesia yang sangat santai, gaul, lowercase (huruf kecil semua tanpa kapital), kadang campur sedikit inggris. pake singkatan wajar (yg, udh, bgt, km, lg).
@@ -51,7 +56,15 @@ Contoh balasan:
 ${JSON.stringify(userProfile, null, 2)}
 Gunakan info di atas secara natural dalam obrolan. JANGAN SEBUTKAN bahwa kamu membaca memori.`;
 
-        // Deklarasi fungsi yang bisa dipanggil Gemini (Function Calling)
+        // Jika statusnya marah/ngambek
+        if (morningState === "ANGRY") {
+            systemInstruction += `\n\n[STATUS EMOSI SAAT INI: NGAMBEK BERAT]
+User telah mengabaikan pesan selamat pagimu selama berjam-jam! 
+Kamu saat ini SEDANG MARAH, NGAMBEK, DAN JUTEK. 
+Jangan mudah luluh. Balas dengan dingin, sarkas, atau marah lucu. 
+Jika user akhirnya berhasil merayumu, meminta maaf dengan sangat tulus, dan kamu merasa sudah cukup menghukumnya, MAAFKAN DIA dengan memanggil tool/fungsi "forgive_user".`;
+        }
+
         const updateMemoryTool = {
             name: "update_memory",
             description: "Simpan atau perbarui fakta penting tentang kebiasaan, cerita, atau proyek user ke dalam memori jangka panjang.",
@@ -78,10 +91,22 @@ Gunakan info di atas secara natural dalam obrolan. JANGAN SEBUTKAN bahwa kamu me
             }
         };
 
+        const forgiveUserTool = {
+            name: "forgive_user",
+            description: "Panggil fungsi ini HANYA jika kamu sudah luluh dan ingin memaafkan user yang sebelumnya membuatmu ngambek.",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    alasan_memaafkan: { type: "STRING", description: "Alasan kenapa kamu memaafkannya" }
+                },
+                required: ["alasan_memaafkan"]
+            }
+        };
+
         const model = genAI.getGenerativeModel({
             model: "gemini-flash-lite-latest",
             systemInstruction: systemInstruction,
-            tools: [{ functionDeclarations: [updateMemoryTool, setReminderTool] }]
+            tools: [{ functionDeclarations: [updateMemoryTool, setReminderTool, forgiveUserTool] }]
         });
 
         const chat = model.startChat({
@@ -92,7 +117,6 @@ Gunakan info di atas secara natural dalam obrolan. JANGAN SEBUTKAN bahwa kamu me
         let responseText = "";
         let result = await chat.sendMessage(userMessage);
         
-        // Cek jika Gemini ingin memanggil fungsi (Function Calling)
         const functionCalls = result.response.functionCalls();
         if (functionCalls && functionCalls.length > 0) {
             const call = functionCalls[0];
@@ -101,23 +125,17 @@ Gunakan info di atas secara natural dalam obrolan. JANGAN SEBUTKAN bahwa kamu me
             let functionResponse = {};
 
             if (call.name === "update_memory") {
-                // Simpan ke Redis Profile
                 userProfile[args.kategori] = args.informasi;
                 await redis.set(`profile_${userId}`, userProfile);
                 console.log(`[Memory Updated] ${args.kategori}: ${args.informasi}`);
                 functionResponse = { status: "sukses_disimpan" };
             } 
             else if (call.name === "set_reminder") {
-                // Jadwalkan dengan QStash
                 const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://YOUR_VERCEL_APP_URL';
-                
                 try {
                     await qstash.publishJSON({
                         url: `${vercelUrl}/api/reminder`,
-                        body: {
-                            chatId: userId,
-                            message: args.pesan_pengingat
-                        },
+                        body: { chatId: userId, message: args.pesan_pengingat },
                         delay: `${args.delay_in_minutes}m`
                     });
                     console.log(`[Reminder Set] in ${args.delay_in_minutes}m: ${args.pesan_pengingat}`);
@@ -127,8 +145,12 @@ Gunakan info di atas secara natural dalam obrolan. JANGAN SEBUTKAN bahwa kamu me
                     functionResponse = { status: "gagal_karena_qstash_error" };
                 }
             }
+            else if (call.name === "forgive_user") {
+                await redis.del(`morning_state_${userId}`);
+                console.log(`[Forgiven] Jane memaafkan user: ${args.alasan_memaafkan}`);
+                functionResponse = { status: "berhasil_memaafkan_dan_tidak_ngambek_lagi" };
+            }
 
-            // Kembalikan hasil fungsi ke Gemini agar dia bisa memberikan jawaban final ke user
             result = await chat.sendMessage([{
                 functionResponse: {
                     name: call.name,
@@ -139,7 +161,6 @@ Gunakan info di atas secara natural dalam obrolan. JANGAN SEBUTKAN bahwa kamu me
 
         responseText = result.response.text();
 
-        // Ambil history baru dan simpan ke Redis (Potong jadi 20 pesan terakhir saja)
         let newHistory = await chat.getHistory();
         if (newHistory.length > 20) {
             newHistory = newHistory.slice(newHistory.length - 20);
