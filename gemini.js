@@ -40,8 +40,14 @@ async function getJaneDoeResponse(userId, userMessage) {
             });
 
             if (validParts.length > 0) {
+                let safeRole = msg.role;
+                // Gemini 3.6+ strict role checking: 'function' role is deprecated, must use 'user' for function responses.
+                if (safeRole === 'function') {
+                    safeRole = 'user';
+                }
+
                 chatHistory.push({
-                    role: msg.role,
+                    role: safeRole,
                     parts: validParts
                 });
             }
