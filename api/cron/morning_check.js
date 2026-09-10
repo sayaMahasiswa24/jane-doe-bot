@@ -1,6 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { Redis } = require("@upstash/redis");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { logError } = require('../../utils/logger');
 require('dotenv').config();
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -45,14 +46,14 @@ jangan bertele-tele. jangan pakai tanda | untuk pesan ini.`;
                     await redis.set(`morning_state_${userId}`, "ANGRY");
                     console.log(`[Morning Check] User ${userId} ignored Jane. Set to ANGRY.`);
                 } catch (err) {
-                    console.error(`Gagal mengirim ke ${userId}:`, err);
+                    await logError("Cron Morning Check", `Gagal mengirim ke ${userId}`, err);
                 }
             }
         }
 
         return res.status(200).send('Morning check executed');
     } catch (error) {
-        console.error('Cron Error:', error);
+        await logError("Cron Morning Check", "General Error executing morning check", error);
         return res.status(500).send('Error executing morning check');
     }
 };

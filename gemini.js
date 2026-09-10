@@ -1,6 +1,7 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { Redis } = require("@upstash/redis");
 const { Client } = require("@upstash/qstash");
+const { logError } = require("./utils/logger");
 require("dotenv").config();
 
 async function getJaneDoeResponse(userId, userMessage) {
@@ -141,7 +142,7 @@ Jika user akhirnya berhasil merayumu, meminta maaf dengan sangat tulus, dan kamu
                     console.log(`[Reminder Set] in ${args.delay_in_minutes}m: ${args.pesan_pengingat}`);
                     functionResponse = { status: "alarm_berhasil_dijadwalkan" };
                 } catch (err) {
-                    console.error("QStash Error:", err);
+                    await logError("Gemini Function: set_reminder", "QStash Error", err);
                     functionResponse = { status: "gagal_karena_qstash_error" };
                 }
             }
@@ -170,7 +171,7 @@ Jika user akhirnya berhasil merayumu, meminta maaf dengan sangat tulus, dan kamu
         return responseText;
 
     } catch (error) {
-        console.error("Error communicating with Gemini:", error);
+        await logError("Gemini Core", "Error communicating with Gemini", error);
         return "aduh sayang.. kepalaku pusing bgt nih (error api) 😭 | coba chat lagi nanti ya.";
     }
 }

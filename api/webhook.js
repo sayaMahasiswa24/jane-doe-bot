@@ -1,5 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { getJaneDoeResponse } = require('../gemini');
+const { logError } = require('../utils/logger');
 require('dotenv').config();
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -46,7 +47,7 @@ module.exports = async (req, res) => {
             return res.status(200).send('Jane Doe Webhook is active!');
         }
     } catch (error) {
-        console.error('Webhook Error:', error);
+        await logError('Webhook', 'General Error', error);
         return res.status(200).send('OK');
     }
 };

@@ -1,6 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { Redis } = require("@upstash/redis");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { logError } = require('../../utils/logger');
 require('dotenv').config();
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -43,13 +44,13 @@ jangan bertele-tele. jangan pakai tanda | untuk pesan ini.`;
                 await redis.set(`morning_state_${userId}`, "WAITING_REPLY");
                 console.log(`[Morning Routine] Woke up user ${userId}`);
             } catch (err) {
-                console.error(`Gagal mengirim ke ${userId}:`, err);
+                await logError("Cron Morning", `Gagal mengirim ke ${userId}`, err);
             }
         }
 
         return res.status(200).send('Morning routine executed');
     } catch (error) {
-        console.error('Cron Error:', error);
+        await logError("Cron Morning", "General Error executing morning routine", error);
         return res.status(500).send('Error executing morning routine');
     }
 };

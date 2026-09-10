@@ -1,4 +1,5 @@
 const TelegramBot = require('node-telegram-bot-api');
+const { logError } = require('../utils/logger');
 require('dotenv').config();
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -23,7 +24,7 @@ module.exports = async (req, res) => {
             return res.status(405).send('Method Not Allowed');
         }
     } catch (error) {
-        console.error('Reminder Error:', error);
+        await logError("Reminder", "Error sending reminder", error);
         return res.status(500).send('Internal Server Error');
     }
 };
