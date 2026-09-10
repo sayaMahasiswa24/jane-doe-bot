@@ -24,10 +24,25 @@ async function getJaneDoeResponse(userId, userMessage) {
 
         let userProfile = await redis.get(`profile_${userId}`) || {};
         let rawHistory = await redis.get(`history_${userId}`) || [];
-        let chatHistory = rawHistory.map(msg => ({
-            role: msg.role,
-            parts: msg.parts
-        }));
+        let chatHistory = [];
+        for (const msg of rawHistory) {
+            if (!msg || !msg.role || !msg.parts || !Array.isArray(msg.parts)) continue;
+            
+            // Filter parts yang valid
+            const validParts = msg.parts.filter(p => {
+                if (p.text && p.text.trim().length > 0) return true;
+                if (p.functionCall) return true;
+                if (p.functionResponse) return true;
+                return false;
+            });
+
+            if (validParts.length > 0) {
+                chatHistory.push({
+                    role: msg.role,
+                    parts: validParts
+                });
+            }
+        }
 
         // Mengecek status alarm pagi
         let morningState = await redis.get(`morning_state_${userId}`);
