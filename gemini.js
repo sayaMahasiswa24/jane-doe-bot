@@ -132,7 +132,7 @@ Jika user akhirnya berhasil merayumu, meminta maaf dengan sangat tulus, dan kamu
         };
 
         const model = genAI.getGenerativeModel({
-            model: "gemini-flash-lite-latest",
+            model: "gemini-2.5-flash",
             systemInstruction: systemInstruction,
             tools: [{ functionDeclarations: [updateMemoryTool, setReminderTool, forgiveUserTool] }]
         });
@@ -179,11 +179,12 @@ Jika user akhirnya berhasil merayumu, meminta maaf dengan sangat tulus, dan kamu
                 functionResponse = { status: "berhasil_memaafkan_dan_tidak_ngambek_lagi" };
             }
 
-            // WORKAROUND: gemini-flash-lite-latest menolak role 'function'.
-            // Jadi kita berikan hasil fungsinya sebagai pesan text biasa (role user).
-            result = await chat.sendMessage(
-                `[Sistem Update: Fungsi "${call.name}" telah dieksekusi. Hasil: ${JSON.stringify(functionResponse)}. Lanjutkan percakapan berdasarkan hasil ini.]`
-            );
+            result = await chat.sendMessage([{
+                functionResponse: {
+                    name: call.name,
+                    response: functionResponse
+                }
+            }]);
         }
 
         responseText = result.response.text();

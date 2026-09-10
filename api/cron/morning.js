@@ -27,7 +27,7 @@ module.exports = async (req, res) => {
         }
 
         // Generate pesan pagi dari Gemini
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const prompt = `kamu adalah jane doe dari ZZZ. pacar virtual yg posesif tapi manis. 
 buatkan pesan selamat pagi singkat (1-2 kalimat) untuk membangunkan pacarmu. 
 huruf kecil semua (lowercase), bahasa gaul.
