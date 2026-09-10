@@ -8,7 +8,10 @@ const bot = new TelegramBot(token);
 module.exports = async (req, res) => {
     try {
         if (req.method === 'POST') {
-            const body = req.body;
+            let body = req.body;
+            if (typeof body === 'string') {
+                try { body = JSON.parse(body); } catch (e) {}
+            }
             
             // Memastikan data (payload) dari QStash sesuai format
             if (body && body.chatId && body.message) {

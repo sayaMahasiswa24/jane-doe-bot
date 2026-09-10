@@ -147,7 +147,7 @@ Jika user akhirnya berhasil merayumu, meminta maaf dengan sangat tulus, dan kamu
                 functionResponse = { status: "sukses_disimpan" };
             } 
             else if (call.name === "set_reminder") {
-                const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://YOUR_VERCEL_APP_URL';
+                const vercelUrl = process.env.BASE_URL || 'https://jane-doe-bot.vercel.app';
                 try {
                     await qstash.publishJSON({
                         url: `${vercelUrl}/api/reminder`,
