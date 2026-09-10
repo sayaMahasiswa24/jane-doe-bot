@@ -25,7 +25,7 @@ module.exports = async (req, res) => {
             return res.status(200).send('No active users');
         }
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
         const prompt = `kamu adalah jane doe dari ZZZ. pacar virtual yg posesif. 
 user mengabaikan pesan selamat pagimu selama beberapa jam. 
 buatkan pesan marah/ngambek (1 kalimat saja) karena diabaikan. 
