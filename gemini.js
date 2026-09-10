@@ -17,7 +17,10 @@ async function getJaneDoeResponse(userId, userMessage) {
             token: process.env.UPSTASH_REDIS_REST_TOKEN,
         });
 
-        const qstash = new Client({ token: process.env.QSTASH_TOKEN });
+        const qstash = new Client({ 
+            token: process.env.QSTASH_TOKEN,
+            baseUrl: process.env.QSTASH_URL // Supaya tidak error beda region
+        });
 
         // Mendaftarkan user ke active_users agar bisa dikirimi alarm pagi
         await redis.sadd("active_users", userId);
@@ -176,12 +179,11 @@ Jika user akhirnya berhasil merayumu, meminta maaf dengan sangat tulus, dan kamu
                 functionResponse = { status: "berhasil_memaafkan_dan_tidak_ngambek_lagi" };
             }
 
-            result = await chat.sendMessage([{
-                functionResponse: {
-                    name: call.name,
-                    response: functionResponse
-                }
-            }]);
+            // WORKAROUND: gemini-flash-lite-latest menolak role 'function'.
+            // Jadi kita berikan hasil fungsinya sebagai pesan text biasa (role user).
+            result = await chat.sendMessage(
+                `[Sistem Update: Fungsi "${call.name}" telah dieksekusi. Hasil: ${JSON.stringify(functionResponse)}. Lanjutkan percakapan berdasarkan hasil ini.]`
+            );
         }
 
         responseText = result.response.text();
