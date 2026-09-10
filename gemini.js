@@ -31,13 +31,18 @@ async function getJaneDoeResponse(userId, userMessage) {
         for (const msg of rawHistory) {
             if (!msg || !msg.role || !msg.parts || !Array.isArray(msg.parts)) continue;
             
-            // Filter parts yang valid
-            const validParts = msg.parts.filter(p => {
-                if (p.text && p.text.trim().length > 0) return true;
-                if (p.functionCall) return true;
-                if (p.functionResponse) return true;
-                return false;
-            });
+            // Filter parts yang valid dan bersihkan functionResponse lama
+            let validParts = [];
+            for (const p of msg.parts) {
+                if (p.text && p.text.trim().length > 0) {
+                    validParts.push(p);
+                } else if (p.functionCall) {
+                    validParts.push(p);
+                } else if (p.functionResponse) {
+                    // Konversi functionResponse lama menjadi teks biasa untuk menghindari error API
+                    validParts.push({ text: `[SISTEM: Eksekusi fungsi '${p.functionResponse.name}' selesai]` });
+                }
+            }
 
             if (validParts.length > 0) {
                 let safeRole = msg.role;
@@ -185,12 +190,10 @@ Jika user akhirnya berhasil merayumu, meminta maaf dengan sangat tulus, dan kamu
                 functionResponse = { status: "berhasil_memaafkan_dan_tidak_ngambek_lagi" };
             }
 
-            result = await chat.sendMessage([{
-                functionResponse: {
-                    name: call.name,
-                    response: functionResponse
-                }
-            }]);
+            // MENGHINDARI BUG 'function' role di SDK:
+            // Alih-alih mengirim format functionResponse yang ditolak API baru,
+            // kita beri tahu Gemini hasil fungsinya melalui teks biasa. Model 3.6 cukup pintar untuk memahaminya.
+            result = await chat.sendMessage(`[SISTEM: Eksekusi fungsi '${call.name}' selesai. Hasil: ${JSON.stringify(functionResponse)}]`);
         }
 
         responseText = result.response.text();
