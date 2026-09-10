@@ -44,6 +44,15 @@ async function getJaneDoeResponse(userId, userMessage) {
             }
         }
 
+        // Gemini MEWAJIBKAN history selalu diawali oleh role 'user'.
+        // Jika karena suatu alasan pesan pertama adalah 'model', kita potong.
+        const firstUserIndex = chatHistory.findIndex(msg => msg.role === 'user');
+        if (firstUserIndex === -1) {
+            chatHistory = [];
+        } else if (firstUserIndex > 0) {
+            chatHistory = chatHistory.slice(firstUserIndex);
+        }
+
         // Mengecek status alarm pagi
         let morningState = await redis.get(`morning_state_${userId}`);
         
@@ -181,6 +190,12 @@ Jika user akhirnya berhasil merayumu, meminta maaf dengan sangat tulus, dan kamu
         if (newHistory.length > 20) {
             newHistory = newHistory.slice(newHistory.length - 20);
         }
+        
+        // Memastikan saat menyimpan, elemen pertamanya tetap 'user'
+        if (newHistory.length > 0 && newHistory[0].role !== 'user') {
+            newHistory.shift();
+        }
+
         await redis.set(`history_${userId}`, newHistory);
 
         return responseText;
